@@ -1,0 +1,141 @@
+# Playbook to provision Prometheus scrapper and node-exporter servers
+# Download binaries from: https://prometheus.io/download/#prometheus
+# Checked with: ansible-lint provision_prometheus.yaml
+---
+- name: Setup Prometheus on your home lab
+  hosts: home_lab
+  become_user: root
+  become: true
+  vars:
+    prometheus_scrapper_version: "2.42.0"
+    prometheus_node_exporter_version: "1.5.0"
+    prometheus_url: "https://github.com/prometheus/prometheus/releases/download"
+    exporter_url: "https://github.com/prometheus/node_exporter/releases/download"
+    prometheus_node_exporter_port: 9100
+    prometheus_install_dir: "/opt/prometheus"
+    prometheus_data_dir: "/data/prometheus"
+    prometheus_conf_dir: "/etc/prometheus"
+  tasks:
+    - name: Set architecture (home lab has amd64 and arm64)
+      set_fact:
+        prom_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+    - name: Prometheus user
+      tags: user
+      ansible.builtin.user:
+        name: prometheus
+        system: true
+        create_home: false
+        comment: "Prometheus service account"
+        shell: /sbin/nologin
+        state: present
+    - name: Prometheus install directory
+      ansible.builtin.file:
+        state: directory
+        owner: "prometheus"
+        path: "{{ prometheus_install_dir }}"
+    - name: Scrapper management
+      when: "'master_lab' in group_names"
+      block:
+        - name: Install Prometheus Scrapper
+          tags: scrapper
+          ansible.builtin.get_url:
+            dest: "/tmp/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
+            url: "{{ prometheus_url }}/v{{ prometheus_scrapper_version }}/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
+            checksum: "sha256:b947e4890d221f6b1d09c963fd0440720f2b5d08c29e190d6365f4b3d3e92a9d"
+            mode: "u=rw"
+        - name: Unpack Prometheus Scrapper
+          tags: unpack_scrapper
+          ansible.builtin.unarchive:
+            remote_src: true
+            owner: "prometheus"
+            group: "prometheus"
+            src: "/tmp/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
+            dest: "{{ prometheus_install_dir }}"
+          notify:
+            - Restart Prometheus
+        - name: Prometheus config directory
+          ansible.builtin.file:
+            state: directory
+            owner: "root"
+            path: "{{ item }}"
+          loop:
+              - "{{ prometheus_conf_dir }}"
+              - "{{ prometheus_data_dir }}"
+        - name: Install Prometheus configuration
+          tags: config_prometheus_copy
+          ansible.builtin.template:
+            src: templates/prometheus.yaml.j2
+            dest: /etc/prometheus/prometheus.yaml
+            owner: root
+            group: root
+          notify:
+            - Restart Prometheus
+        - name: Install Prometheus systemd unit
+          tags: systemd_prometheus_copy
+          ansible.builtin.template:
+            src: templates/prometheus.service.j2
+            dest: /etc/systemd/system/prometheus.service
+            owner: root
+            group: root
+          notify:
+            - Restart Prometheus
+        - name: Make sure Prometheus is running
+          tags: systemd_prometheus_start
+          ansible.builtin.systemd:
+            state: started
+            name: prometheus
+            enabled: true
+            daemon_reload: true
+    - name: Install Prometheus Node exporter
+      tags: exporter
+      ansible.builtin.get_url:
+        dest: "/tmp/node_exporter-{{ prometheus_node_exporter_version }}.linux-{{ prom_arch }}.tar.gz"
+        url: "{{ exporter_url }}/v{{ prometheus_node_exporter_version }}/node_exporter-{{ prometheus_node_exporter_version }}.linux-{{ prom_arch }}.tar.gz"
+        checksum: "sha256:{{ 'af999fd31ab54ed3a34b9f0b10c28e9acee9ef5ac5a5d5edfdde85437db7acbb' if ansible_architecture == 'x86_64' else 'e031a539af9a619c06774788b54c23fccc2a852d41437315725a086ccdb0ed16' }}"
+        mode: "u=rw"
+    - name: Unpack Node exporter
+      tags: unpack_exporter
+      ansible.builtin.unarchive:
+        remote_src: true
+        owner: "prometheus"
+        group: "prometheus"
+        src: "/tmp/node_exporter-{{ prometheus_node_exporter_version }}.linux-{{ prom_arch }}.tar.gz"
+        dest: "{{ prometheus_install_dir }}"
+      notify:
+        - Restart Node Exporter
+    - name: Install Node Exporter systemd unit
+      tags: systemd_node_exporter_copy
+      ansible.builtin.template:
+        src: templates/node_exporter.service.j2
+        dest: /etc/systemd/system/node_exporter.service
+        owner: root
+        group: root
+      notify:
+        - Restart Node Exporter
+    - name: Install Node Exporter environment overrides
+      tags: systemd_node_exporter_env
+      ansible.builtin.copy:
+        src: files/prometheus-node-exporter
+        dest: /etc/default/prometheus-node-exporter
+        owner: root
+        group: root
+      notify:
+        - Restart Node Exporter
+    - name: Make sure Node Exporter is running
+      tags: systemd_node_exporter_start
+      ansible.builtin.systemd:
+        state: started
+        name: node_exporter
+        enabled: true
+        daemon_reload: true
+  handlers:
+    - name: Restart Node Exporter
+      tags: restart_node_exporter
+      ansible.builtin.service:
+        name: node_exporter
+        state: restarted
+    - name: Restart Prometheus
+      tags: restart_prometheus
+      ansible.builtin.service:
+        name: prometheus
+        state: restarted

@@ -1,0 +1,16 @@
+[Unit]
+Description=Node exporter Server
+Documentation=https://prometheus.io/docs/guides/node-exporter/
+After=network-online.target
+
+[Service]
+Restart=always
+User=prometheus
+EnvironmentFile=/etc/default/prometheus-node-exporter
+ExecStart={{ prometheus_install_dir }}/node_exporter-{{ prometheus_node_exporter_version }}.linux-{{ prom_arch }}/node_exporter $ARGS
+ExecReload=/bin/kill -HUP $MAINPID
+TimeoutStopSec=20s
+SendSIGKILL=no
+
+[Install]
+WantedBy=multi-user.target

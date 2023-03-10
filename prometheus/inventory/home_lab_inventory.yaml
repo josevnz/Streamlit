@@ -1,0 +1,12 @@
+# Host inventory for the home lab
+# https://docs.ansible.com/ansible/latest/inventory_guide/intro_inventory.html
+---
+all:
+  children:
+    master_lab:
+      hosts:
+        raspberrypi.home:
+    home_lab:
+      hosts:
+        dmaf5.home:
+        raspberrypi.home:
