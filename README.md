@@ -807,6 +807,8 @@ if __name__ == "__main__":
                                 st.write("Refreshing")
                                 st.experimental_rerun()
                             # st.line_chart(data=data)
+                            # You can see all the possible type encodings here: 
+                            # https://altair-viz.github.io/altair-tutorial/notebooks/02-Simple-Charts.html
                             chart = (
                                 altair.Chart(data.stack().rename("value").reset_index()).mark_line().encode(
                                     x="level_0:T",
