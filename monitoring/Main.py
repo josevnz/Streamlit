@@ -5,6 +5,7 @@ from json.decoder import JSONDecodeError
 import os
 import textwrap
 
+import altair
 import requests
 import streamlit as st
 from pandas import DataFrame, Series, Timestamp
@@ -106,7 +107,15 @@ if __name__ == "__main__":
                             if st.button('Click to refresh!'):
                                 st.write("Refreshing")
                                 st.experimental_rerun()
-                            st.line_chart(data=data)
+                            # st.line_chart(data=data)
+                            chart = (
+                                altair.Chart(data.stack().rename("value").reset_index()).mark_line().encode(
+                                    x="level_0:T",
+                                    y="value:Q",
+                                    color="level_1"
+                                )
+                            )
+                            st.altair_chart(chart, use_container_width=True)
 
                     except ValueError as val:
                         st.exception(val)
