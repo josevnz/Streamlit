@@ -474,4 +474,4 @@ Let's recap a few things:
 * There is much more you can do, applications can be polished to be more interactive and the ability of this framework to interact with external graphic libraries makes it very attractive to create good-looking applications with very little code.
 * You also learned how to package your fresh from the oven Streamlit with a [Podman](https://podman.io/) container, so it can be run anywhere with the latest version of Python.
 
-In a follow-up article I will show you how you can use Streamlit to monitor your infrastructure, by talking to datasources like Prometheus.
+In a [follow-up article](MONITORING.md) I will show you how you can use Streamlit to monitor your infrastructure, by talking to datasources like Prometheus.
