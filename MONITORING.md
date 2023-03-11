@@ -1,4 +1,4 @@
-# Using Streamlit to display your data
+# Using Streamlit to monitor your infrastructure
 
 [Streamlit](https://streamlit.io/) is an [Open Source](https://github.com/streamlit/streamlit) data visualization framework written in Python. It is aimed to data science, finance, machine learning and any other discipline that requires to display data that can be obtained programmatically.
 
