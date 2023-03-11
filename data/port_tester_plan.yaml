@@ -1,0 +1,19 @@
+# Description of host and TCP ports to check
+---
+hosts:
+  - name: raspberrypi.home
+    ports:
+      - 3000
+      - 22
+      - 9090
+  - name: dmaf5.home
+    ports:
+      - 22
+  - name: www.redhat.com
+    ports:
+      - 80
+      - 443
+  - name: github.com
+    ports:
+      - 80
+      - 443

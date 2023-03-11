@@ -4,10 +4,17 @@
 
 What sets Streamlit apart from other frameworks is that is very easy to use and offers a very low entry barrier to people to write applications that require displaying application in sophisticated ways or needs to integrate with existing Python code.
 
-This article will cover the following topics, if you need a gentle introduction you can check my [previous piece about Streamlit](INTRODUCTION.md).
+This article will cover the following topics, if you need a gentle introduction (you can check my [previous piece about Streamlit](INTRODUCTION.md)):
 
-* How to quickly set up a Prometheus node exporter and a scrapper to collect metrics about your system, using an Ansible playbook.
-* How to connect to the Prometheus scrapper to get metrics and display them in real time
+* How to quickly set up a [Prometheus](https://prometheus.io/docs/introduction/overview/) [node exporter](https://prometheus.io/docs/guides/node-exporter/) and a scrapper to collect metrics about your system, using an Ansible playbook.
+* How to connect to the Prometheus scrapper to get metrics and display them in real time using Streamlit
+
+You will need the following to complete the tutorial
+* Elevated permissions to install Prometheus node-exporter and the scrapper
+* Some experience with Python programming
+* Curiosity!
+
+Our first topic is to learn how to collect metrics over time from our machines using Prometheus.
 
 ## Monitor memory utilization periodically from my hosts machines
 
@@ -40,9 +47,9 @@ scrape_configs:
 
 How do we install all the data acquisition pieces?  Let's use an Ansible playbook for that
 
-## Automating the boring stuff with Ansible
+### Provisioning metrics collection (Or how to automate the boring stuff with Ansible)
 
-For our automation recipe to work the following pieces are put together:
+For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_intro.html) to work the following pieces are put together:
 
 1. [Inventory file](prometheus/inventory/home_lab_inventory.yaml): Will tell Ansible where to install and deploy our node-exporter agents
 2. Template to setup the [Prometheus daemon](prometheus/templates/prometheus.yaml.j2) that will collect our metrics.
@@ -194,7 +201,7 @@ For our automation recipe to work the following pieces are put together:
 
 ```
 
-And see it in action (```ansible-playbook --inventory inventory provision_prometheus.yaml```):
+You can see it in action (```ansible-playbook --inventory inventory provision_prometheus.yaml```):
 
 [![asciicast](https://asciinema.org/a/564742.svg)](https://asciinema.org/a/564742)
 
@@ -208,14 +215,14 @@ rate(node_cpu_seconds_total{mode="system"}[1m])
 
 ## Showing Prometheus metrics with Streamlit
 
-Prometheus supports queries using the [PromQL language](https://prometheus.io/docs/prometheus/latest/querying/basics/).  It also offerts a [REST API](https://prometheus.io/docs/prometheus/latest/querying/api/) to run remote queries.
+Prometheus supports queries using the [PromQL language](https://prometheus.io/docs/prometheus/latest/querying/basics/).  It also offers a [REST API](https://prometheus.io/docs/prometheus/latest/querying/api/) to expose those metrics to clients.
 
 To demonstrate how the monitoring works, will use the following metric:
 
 ```sql
 node_memory_MemFree_bytes
 ```
-It returns a JSON response (you can see a [full example](monitoring/prometheus_query_range_example.json) here):
+If you query the scrapper node, it returns a JSON response (you can see a [full example](monitoring/prometheus_query_range_example.json) here):
 
 ```json
 {
@@ -248,7 +255,8 @@ It returns a JSON response (you can see a [full example](monitoring/prometheus_q
  }
 }
 ```
-The code for this monolithic application is quite simple:
+
+The next step is to write a simple application to collect the metrics and display them using a line chart:
 
 ```python
 import json
@@ -391,7 +399,7 @@ if __name__ == "__main__":
             st.exception(exp)
 ```
 
-A few notes here:
+A few things to note here:
 * My datasource is a Prometheus scrapper that returns a JSON document. I convert it to a Panda DataFrame, which is one of the most well-supported formats on Streamlit.
 * After that I just add the graphical components, one tab to show my times series data and the other one to show the data and queries in tabular format, for debugging purposes.
 * I added a button to manually refresh the plot data, but there are ways to auto-refresh the contents.
@@ -400,17 +408,17 @@ How does it look like? Below is a screenshot of the Prometheus times series line
 
 ![](prometheus-monitoring-plot.png)
 
-And the debugging tab:
+And the debugging tab, where you can see the raw data, queries and other useful stuff:
 
 ![](prometheus-monitoring-debug.png)
 
-Now let's talk about how this framework compares against other tools out there and if is a good fit for a DevOps/ Systems administrator
+Let me show you next how Steamlit compares against other tools out there and if is a good fit for a DevOps/ Systems administrator.
 
 ## Comparison of Streamlit with other visualization tools
 
 A brief comparison on what Grafana, InfluxDB and Streamlit can do out of the box can help you to decide which one to use. As usual, no single tool can do everything and most likely you will mix the 3 of them.
 
-My focus is on observability in general for this analysis, some features may be more or less appealing to you (for example if your focus is on data science)
+My focus is on observability in general for this analysis, some features may be more or less appealing to you (for example if your focus is on data science):
 
 | Name      | Version | Tables | Time series graphics | Open Source | Embedded alerting                         | Multiple datasources | Supported language                                        | Automatic data refresh | Easy to write a 'live' paper?                                |
 |-----------|---------|--------|----------------------|-------------|-------------------------------------------|----------------------|-----------------------------------------------------------|------------------------|--------------------------------------------------------------|
@@ -427,6 +435,117 @@ It is interesting because these 3 products overlap in many areas but there are *
 
 So which one you should use? _It depends_. If you need quick prototyping and no alerting Streamlit is a good fit, if you only need a database with simple visualization and alerting then InfluxDB is for you and for a more complete solution (also more complex to setup) you cannot go wrong with Grafana.
 
+## Not everything is dashboards: A TCP port tester written with a Streamlit GUI
+
+As a bonus, I decided to write a simple TCP port scanner with Streamlit. The code is quite simple, you only need to define a [YAML configuration](data/port_tester_plan.yaml) file that tells the app what machines and ports to scan:
+
+```yaml
+# Description of host and TCP ports to check
+---
+hosts:
+  - name: raspberrypi.home
+    ports:
+      - 3000
+      - 22
+      - 9090
+  - name: dmaf5.home
+    ports:
+      - 22
+  - name: www.redhat.com
+    ports:
+      - 80
+      - 443
+  - name: github.com
+    ports:
+      - 80
+      - 443
+```
+
+And [the script](porttester/port_tester.py) that goes through every port and checks if is open or not (this app is not meant to be stealth and is not fast either as it does a sequential port scan):
+
+```python
+#!/usr/bin/env python3
+import logging
+import textwrap
+import socket
+from typing import Any
+from yaml import load
+import streamlit as st
+
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
+
+
+PROGRESS_TEXT = "Scanning hosts. Please wait"
+
+
+def check_tcp_port_xmas(dst_ip: str, dst_port: int) -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            result = sock.connect_ex((dst_ip, dst_port))
+            if result == 0:
+                return "Open"
+            else:
+                return "Closed"
+    except (TypeError, PermissionError) as perm_err:
+        logging.exception(perm_err)
+        return "Error"
+
+
+def load_config(stream) -> Any:
+    return load(stream, Loader=Loader)
+
+
+if __name__ == "__main__":
+    st.title("TCP Port scanner")
+    st.markdown(textwrap.dedent("""
+    Simple TCP/ IP port scanner.
+"""))
+
+    st.file_uploader(
+        "Please provide the configuration file to load",
+        accept_multiple_files=False,
+        key="portscan_config"
+    )
+    if st.session_state['portscan_config']:
+        yaml = load_config(st.session_state['portscan_config'])
+        hosts_details = yaml['hosts']
+        chunks = len(hosts_details)
+        try:
+            data_load_state = st.text('Preparing to scan...')
+            with st.spinner(f"Total hosts to scan: {chunks}"):
+                ip = None
+                for host in hosts_details:
+                    host_name = host['name'].strip()
+                    ports = host['ports']
+                    try:
+                        ip = socket.gethostbyname(host_name)
+                        for port in ports:
+                            status = check_tcp_port_xmas(dst_ip=ip, dst_port=port)
+                            data_load_state.text(f"Processing: {host_name}({ip}):{port}, status={status}")
+                            if status == "Open":
+                                st.info(f"{host_name}:{port}, status={status}")
+                            elif status == "Closed":
+                                st.warning(f"{host_name}:{port}, status={status}")
+                            else:
+                                st.error(f"{host_name}:{port}, status={status}")
+                    except TypeError as os_err:
+                        raise
+            data_load_state.success(f"Finished scanning {chunks} hosts")
+        except (KeyError, ValueError, OSError, TypeError) as err:
+            st.error(hosts_details)
+            st.exception(err)
+    else:
+        st.warning("Please load a PortTester configuration file to proceed")
+
+```
+
+If you run it (````streamlit run porttester/port_tester.py```), you will see something similar to this:
+
+![](tcp-port-scanner.png)
+
 ## Conclusion
 
 Streamlit is very well tuned for data science application, but you can also use it for Infrastructure monitoring. Also, you can create 'live reports' to quickly check the health of your sites, with very little coding.
@@ -434,3 +553,5 @@ Streamlit is very well tuned for data science application, but you can also use 
 * Grafana or InfluxDB may be better suited for infrastructure monitoring, but it doesn't mean Streamlit cannot tap [the same datasources](https://github.com/dcoles/prometheus-pandas). Running on top of Python makes it possible.
 * Programmatic page refresh is [marked as experimental](https://docs.streamlit.io/library/api-reference/control-flow/st.experimental_rerun),  [you can see the original discussion of the feature here](https://github.com/streamlit/streamlit/issues/168).
 * Finally, you can see another take on the [Prometheus](https://prometheus.io/docs/prometheus/latest/querying/api/#expression-query-result-formats) + Pandas combo on this [nice article](https://ricardorocha.io/blog/prometheus-metrics-in-pandas/).
+
+
