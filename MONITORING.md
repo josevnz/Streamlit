@@ -542,7 +542,7 @@ if __name__ == "__main__":
 
 ```
 
-If you run it (````streamlit run porttester/port_tester.py```), you will see something similar to this:
+If you run it (```streamlit run porttester/port_tester.py```), you will see something similar to this:
 
 ![](tcp-port-scanner.png)
 
