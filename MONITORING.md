@@ -74,9 +74,15 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
     prometheus_install_dir: "/opt/prometheus"
     prometheus_data_dir: "/data/prometheus"
     prometheus_conf_dir: "/etc/prometheus"
+    prometheus_checksum:
+      amd64: "422dab055ed9c7bcaff52b718705f9192c6fac0de6b7e78dd278e70ee2663dcc"
+      arm64: "b947e4890d221f6b1d09c963fd0440720f2b5d08c29e190d6365f4b3d3e92a9d"
+    prometheus_node_exporter_checksum:
+      amd64: "af999fd31ab54ed3a34b9f0b10c28e9acee9ef5ac5a5d5edfdde85437db7acbb"
+      arm64: "e031a539af9a619c06774788b54c23fccc2a852d41437315725a086ccdb0ed16"
   tasks:
     - name: Set architecture (home lab has amd64 and arm64)
-      set_fact:
+      ansible.builtin.set_fact:
         prom_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
     - name: Prometheus user
       tags: user
@@ -91,6 +97,7 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
       ansible.builtin.file:
         state: directory
         owner: "prometheus"
+        mode: 0755
         path: "{{ prometheus_install_dir }}"
     - name: Scrapper management
       when: "'master_lab' in group_names"
@@ -100,7 +107,7 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
           ansible.builtin.get_url:
             dest: "/tmp/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
             url: "{{ prometheus_url }}/v{{ prometheus_scrapper_version }}/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
-            checksum: "sha256:b947e4890d221f6b1d09c963fd0440720f2b5d08c29e190d6365f4b3d3e92a9d"
+            checksum: "sha256:{{ prometheus_checksum[prom_arch | default('arm64')] }}"
             mode: "u=rw"
         - name: Unpack Prometheus Scrapper
           tags: unpack_scrapper
@@ -115,18 +122,21 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
         - name: Prometheus config directory
           ansible.builtin.file:
             state: directory
-            owner: "root"
+            owner: "prometheus"
+            group: "prometheus"
+            mode: 0770
             path: "{{ item }}"
           loop:
-              - "{{ prometheus_conf_dir }}"
-              - "{{ prometheus_data_dir }}"
+            - "{{ prometheus_conf_dir }}"
+            - "{{ prometheus_data_dir }}"
         - name: Install Prometheus configuration
           tags: config_prometheus_copy
           ansible.builtin.template:
             src: templates/prometheus.yaml.j2
             dest: /etc/prometheus/prometheus.yaml
-            owner: root
-            group: root
+            owner: prometheus
+            group: prometheus
+            mode: 0644
           notify:
             - Restart Prometheus
         - name: Install Prometheus systemd unit
@@ -136,6 +146,7 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
             dest: /etc/systemd/system/prometheus.service
             owner: root
             group: root
+            mode: 0644
           notify:
             - Restart Prometheus
         - name: Make sure Prometheus is running
@@ -150,7 +161,7 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
       ansible.builtin.get_url:
         dest: "/tmp/node_exporter-{{ prometheus_node_exporter_version }}.linux-{{ prom_arch }}.tar.gz"
         url: "{{ exporter_url }}/v{{ prometheus_node_exporter_version }}/node_exporter-{{ prometheus_node_exporter_version }}.linux-{{ prom_arch }}.tar.gz"
-        checksum: "sha256:{{ 'af999fd31ab54ed3a34b9f0b10c28e9acee9ef5ac5a5d5edfdde85437db7acbb' if ansible_architecture == 'x86_64' else 'e031a539af9a619c06774788b54c23fccc2a852d41437315725a086ccdb0ed16' }}"
+        checksum: "sha256:{{ prometheus_node_exporter_checksum[prom_arch | default('arm64')] }}"
         mode: "u=rw"
     - name: Unpack Node exporter
       tags: unpack_exporter
@@ -169,6 +180,7 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
         dest: /etc/systemd/system/node_exporter.service
         owner: root
         group: root
+        mode: 0644
       notify:
         - Restart Node Exporter
     - name: Install Node Exporter environment overrides
@@ -178,6 +190,7 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
         dest: /etc/default/prometheus-node-exporter
         owner: root
         group: root
+        mode: 0644
       notify:
         - Restart Node Exporter
     - name: Make sure Node Exporter is running
@@ -198,7 +211,6 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
       ansible.builtin.service:
         name: prometheus
         state: restarted
-
 ```
 
 You can see it in action (```ansible-playbook --inventory inventory provision_prometheus.yaml```):
