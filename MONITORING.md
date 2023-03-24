@@ -6,11 +6,11 @@ What sets Streamlit apart from other frameworks is that is very easy to use and 
 
 This article will cover the following topics, if you need a gentle introduction (you can check my [previous piece about Streamlit](INTRODUCTION.md)):
 
-* How to quickly set up a [Prometheus](https://prometheus.io/docs/introduction/overview/) [node exporter](https://prometheus.io/docs/guides/node-exporter/) and a scrapper to collect metrics about your system, using an Ansible playbook.
-* How to connect to the Prometheus scrapper to get metrics and display them in real time using Streamlit
+* How to quickly set up a [Prometheus](https://prometheus.io/docs/introduction/overview/) [node exporter](https://prometheus.io/docs/guides/node-exporter/) and a scraper to collect metrics about your system, using an Ansible playbook.
+* How to connect to the Prometheus scraper to get metrics and display them in real time using Streamlit
 
 You will need the following to complete the tutorial
-* Elevated permissions to install Prometheus node-exporter and the scrapper
+* Elevated permissions to install Prometheus node-exporter and the scraper
 * Some experience with Python programming
 * Curiosity!
 
@@ -20,15 +20,15 @@ Our first topic is to learn how to collect metrics over time from our machines u
 
 [Prometheus](https://prometheus.io/) is an Open Source framework that was created to collect metrics about your system. It also provides visualization, efficient storage and many other cool features.
 
-A typical on-premise Prometheus setup is to have one or more node-exporter collectors and then to have the main scrapper aggregating the data from all those nodes.
+A typical on-premise Prometheus setup is to have one or more node-exporter collectors and then to have the main scraper aggregating the data from all those nodes.
 
 Eventually you can visualize the collected data directly on your http://prometheuscollector:9090/ agent or have another visualization tool like Grafana talking to the collector.
 
 Let's take a look at some pieces first before trying to setup a Streamlit application that can talk to Prometheus.
 
-### The Prometheus collector (scrapper)
+### The Prometheus collector (scraper)
 
-Say my home lab has 2 machines, called raspberrypi and dmaf5, both running node-exporter agents. I can set up my Prometheus scrapper configuration (prometheus.yaml) to reflect that:
+Say my home lab has 2 machines, called raspberrypi and dmaf5, both running node-exporter agents. I can set up my Prometheus scraper configuration (prometheus.yaml) to reflect that:
 
 ```yaml
 ---
@@ -57,7 +57,7 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
 4. The [playbook](prometheus/provision_prometheus.yaml) that will orchestrate all the actions, from copying configurations, downloading software and finally starting processes: 
 
 ```yaml
-# Playbook to provision Prometheus scrapper and node-exporter servers
+# Playbook to provision Prometheus scraper and node-exporter servers
 # Download binaries from: https://prometheus.io/download/#prometheus
 # Checked with: ansible-lint provision_prometheus.yaml
 ---
@@ -66,7 +66,7 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
   become_user: root
   become: true
   vars:
-    prometheus_scrapper_version: "2.42.0"
+    prometheus_scraper_version: "2.42.0"
     prometheus_node_exporter_version: "1.5.0"
     prometheus_url: "https://github.com/prometheus/prometheus/releases/download"
     exporter_url: "https://github.com/prometheus/node_exporter/releases/download"
@@ -103,19 +103,19 @@ For our [automation recipe](https://docs.ansible.com/ansible/latest/playbook_gui
       when: "'master_lab' in group_names"
       block:
         - name: Install Prometheus Scrapper
-          tags: scrapper
+          tags: scraper
           ansible.builtin.get_url:
-            dest: "/tmp/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
-            url: "{{ prometheus_url }}/v{{ prometheus_scrapper_version }}/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
+            dest: "/tmp/prometheus-{{ prometheus_scraper_version }}.linux-{{ prom_arch }}.tar.gz"
+            url: "{{ prometheus_url }}/v{{ prometheus_scraper_version }}/prometheus-{{ prometheus_scraper_version }}.linux-{{ prom_arch }}.tar.gz"
             checksum: "sha256:{{ prometheus_checksum[prom_arch | default('arm64')] }}"
             mode: "u=rw"
         - name: Unpack Prometheus Scrapper
-          tags: unpack_scrapper
+          tags: unpack_scraper
           ansible.builtin.unarchive:
             remote_src: true
             owner: "prometheus"
             group: "prometheus"
-            src: "/tmp/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
+            src: "/tmp/prometheus-{{ prometheus_scraper_version }}.linux-{{ prom_arch }}.tar.gz"
             dest: "{{ prometheus_install_dir }}"
           notify:
             - Restart Prometheus
@@ -234,7 +234,7 @@ To demonstrate how the monitoring works, will use the following metric:
 ```sql
 node_memory_MemFree_bytes
 ```
-If you query the scrapper node, it returns a JSON response (you can see a [full example](monitoring/prometheus_query_range_example.json) here):
+If you query the scraper node, it returns a JSON response (you can see a [full example](monitoring/prometheus_query_range_example.json) here):
 
 ```json
 {
@@ -412,7 +412,7 @@ if __name__ == "__main__":
 ```
 
 A few things to note here:
-* My datasource is a Prometheus scrapper that returns a JSON document. I convert it to a Panda DataFrame, which is one of the most well-supported formats on Streamlit.
+* My datasource is a Prometheus scraper that returns a JSON document. I convert it to a Panda DataFrame, which is one of the most well-supported formats on Streamlit.
 * After that I just add the graphical components, one tab to show my times series data and the other one to show the data and queries in tabular format, for debugging purposes.
 * I added a button to manually refresh the plot data, but there are ways to auto-refresh the contents.
 

@@ -1,4 +1,4 @@
-# Playbook to provision Prometheus scrapper and node-exporter servers
+# Playbook to provision Prometheus scraper and node-exporter servers
 # Download binaries from: https://prometheus.io/download/#prometheus
 # Checked with: ansible-lint provision_prometheus.yaml
 ---
@@ -7,7 +7,7 @@
   become_user: root
   become: true
   vars:
-    prometheus_scrapper_version: "2.42.0"
+    prometheus_scraper_version: "2.42.0"
     prometheus_node_exporter_version: "1.5.0"
     prometheus_url: "https://github.com/prometheus/prometheus/releases/download"
     exporter_url: "https://github.com/prometheus/node_exporter/releases/download"
@@ -44,19 +44,19 @@
       when: "'master_lab' in group_names"
       block:
         - name: Install Prometheus Scrapper
-          tags: scrapper
+          tags: scraper
           ansible.builtin.get_url:
-            dest: "/tmp/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
-            url: "{{ prometheus_url }}/v{{ prometheus_scrapper_version }}/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
+            dest: "/tmp/prometheus-{{ prometheus_scraper_version }}.linux-{{ prom_arch }}.tar.gz"
+            url: "{{ prometheus_url }}/v{{ prometheus_scraper_version }}/prometheus-{{ prometheus_scraper_version }}.linux-{{ prom_arch }}.tar.gz"
             checksum: "sha256:{{ prometheus_checksum[prom_arch | default('arm64')] }}"
             mode: "u=rw"
         - name: Unpack Prometheus Scrapper
-          tags: unpack_scrapper
+          tags: unpack_scraper
           ansible.builtin.unarchive:
             remote_src: true
             owner: "prometheus"
             group: "prometheus"
-            src: "/tmp/prometheus-{{ prometheus_scrapper_version }}.linux-{{ prom_arch }}.tar.gz"
+            src: "/tmp/prometheus-{{ prometheus_scraper_version }}.linux-{{ prom_arch }}.tar.gz"
             dest: "{{ prometheus_install_dir }}"
           notify:
             - Restart Prometheus
