@@ -1,5 +1,7 @@
 # What is it on this repository?
 
+![](mazinger-z.png)
+
 This repository contains code that will introduce you to Streamlit and also how you can use 
 it to monitor your infrastructure. It is split in two parts:
 
